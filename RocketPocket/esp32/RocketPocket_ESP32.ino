@@ -17,6 +17,7 @@
  *   S  stop
  *   +  speed up   (+15)
  *   -  speed down (-15)
+ *   T  wiring self-test (drives one motor at a time — see the invert flags below)
  *
  * Sent back to the app:  SPEED:<0-255>\n
  */
@@ -76,6 +77,20 @@ static inline void pwmWrite(int pin, int channel, int duty) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Wiring corrections — fix a mis-wired car here instead of re-soldering
+// ---------------------------------------------------------------------------------------------
+// Send 'T' from the app (or the Serial Monitor) to run the self-test: it drives each motor
+// forward then backward on its own and prints what it is doing, which tells you exactly which
+// flag to flip.
+//
+//   Car drives backwards when you press Forward   -> set BOTH invert flags to true
+//   Car spins on the spot when you press Forward  -> set ONE invert flag to true
+//   Left and right are swapped                    -> set SWAP_MOTORS to true
+const bool INVERT_LEFT_MOTOR  = false;
+const bool INVERT_RIGHT_MOTOR = false;
+const bool SWAP_MOTORS        = false;
+
+// ---------------------------------------------------------------------------------------------
 // Speed
 // ---------------------------------------------------------------------------------------------
 const int DEFAULT_SPEED = 150;   // must match ControlViewModel.DEFAULT_SPEED
@@ -108,6 +123,7 @@ bool isMoving = false;
 
 // Signed duty: positive drives forward, negative reverses, zero coasts.
 void driveLeft(int duty) {
+  if (INVERT_LEFT_MOTOR) duty = -duty;
   int magnitude = constrain(abs(duty), 0, MAX_SPEED);
   digitalWrite(LEFT_MOTOR_IN1, duty > 0 ? HIGH : LOW);
   digitalWrite(LEFT_MOTOR_IN2, duty < 0 ? HIGH : LOW);
@@ -115,6 +131,7 @@ void driveLeft(int duty) {
 }
 
 void driveRight(int duty) {
+  if (INVERT_RIGHT_MOTOR) duty = -duty;
   int magnitude = constrain(abs(duty), 0, MAX_SPEED);
   digitalWrite(RIGHT_MOTOR_IN3, duty > 0 ? HIGH : LOW);
   digitalWrite(RIGHT_MOTOR_IN4, duty < 0 ? HIGH : LOW);
@@ -122,9 +139,20 @@ void driveRight(int duty) {
 }
 
 void drive(int leftDuty, int rightDuty) {
-  driveLeft(leftDuty);
-  driveRight(rightDuty);
+  if (SWAP_MOTORS) {
+    driveLeft(rightDuty);
+    driveRight(leftDuty);
+  } else {
+    driveLeft(leftDuty);
+    driveRight(rightDuty);
+  }
   isMoving = (leftDuty != 0 || rightDuty != 0);
+
+  // Printing the resulting duties next to the command makes a wrong turn obvious in one line.
+  Serial.print("  -> L=");
+  Serial.print(leftDuty);
+  Serial.print(" R=");
+  Serial.println(rightDuty);
 }
 
 void stopMotors() {
@@ -134,6 +162,46 @@ void stopMotors() {
 
 int innerWheelDuty() {
   return (int)(currentSpeed * CURVE_INNER_RATIO);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Self-test
+// ---------------------------------------------------------------------------------------------
+
+// Drives one motor at a time so you can see which physical wheel responds and which way it
+// turns. Run it with the car held off the ground, then set the invert/swap flags to match.
+void runSelfTest() {
+  const int testDuty = 150;
+
+  Serial.println("SELF TEST: left motor FORWARD");
+  drive(testDuty, 0);
+  delay(1000);
+  drive(0, 0);
+  delay(400);
+
+  Serial.println("SELF TEST: left motor BACKWARD");
+  drive(-testDuty, 0);
+  delay(1000);
+  drive(0, 0);
+  delay(400);
+
+  Serial.println("SELF TEST: right motor FORWARD");
+  drive(0, testDuty);
+  delay(1000);
+  drive(0, 0);
+  delay(400);
+
+  Serial.println("SELF TEST: right motor BACKWARD");
+  drive(0, -testDuty);
+  delay(1000);
+
+  stopMotors();
+  Serial.println("SELF TEST: done");
+  Serial.println("  Wrong wheel moved      -> set SWAP_MOTORS = true");
+  Serial.println("  Wheel turned backwards -> set that motor's INVERT flag to true");
+
+  // The watchdog measures silence since the last command; this test blocked for ~5 s.
+  lastCommandAt = millis();
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -160,6 +228,10 @@ void changeSpeed(int delta) {
 
 void handleCommand(char command) {
   lastCommandAt = millis();
+
+  // Printed before acting so it lands above the "-> L= R=" line that drive() emits.
+  Serial.print("RX: ");
+  Serial.println(command);
 
   switch (command) {
     case 'F':  // forward
@@ -206,13 +278,15 @@ void handleCommand(char command) {
       changeSpeed(-SPEED_STEP);
       break;
 
+    case 'T':  // wiring self-test
+    case 't':
+      runSelfTest();
+      return;
+
     default:
       // Ignore newlines and anything unrecognised rather than reacting unpredictably.
       return;
   }
-
-  Serial.print("RX: ");
-  Serial.println(command);
 }
 
 // ---------------------------------------------------------------------------------------------

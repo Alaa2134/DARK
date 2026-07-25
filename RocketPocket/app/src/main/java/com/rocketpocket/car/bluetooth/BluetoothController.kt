@@ -87,6 +87,16 @@ class BluetoothController(private val context: Context) {
     )
     val incomingLines: SharedFlow<String> = _incomingLines.asSharedFlow()
 
+    /**
+     * The last character actually written to the socket, and a counter that changes on every
+     * write. The counter lets the UI flash even when the same character is sent twice in a row,
+     * which is what makes the on-screen TX indicator usable for diagnosing button mapping.
+     */
+    private val _lastSent = MutableStateFlow<Pair<Char, Long>?>(null)
+    val lastSent: StateFlow<Pair<Char, Long>?> = _lastSent.asStateFlow()
+
+    private var sendCounter = 0L
+
     /** User-facing one-off notices such as [EVENT_CONNECTION_LOST]. */
     private val _events = MutableSharedFlow<String>(
         extraBufferCapacity = 8,
@@ -291,6 +301,7 @@ class BluetoothController(private val context: Context) {
                 try {
                     stream.write(command.code)
                     stream.flush()
+                    _lastSent.value = command to ++sendCounter
                 } catch (e: IOException) {
                     Log.w(TAG, "Write of '$command' failed", e)
                     handleConnectionLost()

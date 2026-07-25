@@ -232,7 +232,56 @@ RocketPocket/
 
 ---
 
-## 9. Troubleshooting
+## 9. The car moves the wrong way — fixing it in one line
+
+Wrong movement is almost always wiring, not code. Two tools make it a two-minute fix.
+
+### The TX / RX strip in the app
+
+The dashboard header shows the last byte sent (**TX**) and the last line received (**RX**). Press
+a button and read TX:
+
+- **TX shows the right character** (`F` for Forward, `I` for Fwd Right, and so on) — the app is
+  fine, the fault is in the wiring. Use the self-test below.
+- **TX does not change** — the press is not registering, or you are not connected.
+
+This means you never need a laptop to tell an app problem from a car problem.
+
+### The `T` self-test
+
+Hold the car with the **wheels off the ground**, open the Serial Monitor at 115200, and send `T`.
+Each motor runs forward then backward on its own:
+
+```
+SELF TEST: left motor FORWARD
+SELF TEST: left motor BACKWARD
+SELF TEST: right motor FORWARD
+SELF TEST: right motor BACKWARD
+```
+
+Watch which wheel moves and which way, then set the flags at the top of the sketch:
+
+| What you saw | Fix |
+|---|---|
+| Press Forward, car drives backwards | `INVERT_LEFT_MOTOR = true` **and** `INVERT_RIGHT_MOTOR = true` |
+| Press Forward, car spins on the spot | Set the invert flag for whichever motor turned the wrong way |
+| Left and right are swapped | `SWAP_MOTORS = true` |
+| The wrong wheel moved during the test | `SWAP_MOTORS = true` |
+
+Re-flash and re-test. Every command also prints the resulting duties, so a wrong turn is visible
+in one line:
+
+```
+RX: I
+  -> L=150 R=60
+```
+
+`L=150 R=60` means the left wheel is driving harder than the right, so the car curves to the
+right — which is what `I` (Fwd Right) should do.
+
+---
+
+## 10. Troubleshooting
 
 | Symptom | Fix |
 |---|---|
@@ -240,7 +289,8 @@ RocketPocket/
 | `Connection failed` | Power-cycle the ESP32; make sure no other phone holds the connection (SPP allows only one) |
 | Connects then drops instantly | Check the common ground and that the motor battery is not browning out the ESP32 |
 | Buttons do nothing, pill is green | Confirm the sketch is the one in `esp32/`, and the Serial Monitor is at 115200 |
-| Car drives the wrong way | Swap that motor's two `IN` wires, or its `IN` pin numbers in the sketch |
+| Car drives the wrong way | Run the `T` self-test and set the invert/swap flags — see §9 |
+| Some buttons do not respond | Fixed: a queue of snackbars used to cover the bottom button row. Update to the latest build |
 | Curves too tight or too wide | Adjust `CURVE_INNER_RATIO` in the sketch (0.0 = pivot, 1.0 = straight) |
 | Sketch will not compile | You are on an ESP32-S2/S3/C3 — those have no Bluetooth Classic. Use a classic ESP32 |
 | Car keeps stopping while held | The link is dropping packets; check battery level and distance |

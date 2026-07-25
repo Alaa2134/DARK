@@ -1,6 +1,7 @@
 package com.rocketpocket.car.viewmodel
 
 import android.app.Application
+import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.rocketpocket.car.bluetooth.BluetoothController
@@ -36,6 +37,9 @@ class ControlViewModel(application: Application) : AndroidViewModel(application)
         /** Comfortably inside the firmware's 1000 ms watchdog window. */
         const val KEEP_ALIVE_INTERVAL_MS = 300L
 
+        /** One "connect first" notice per this window, however many buttons get pressed. */
+        const val NOT_CONNECTED_NOTICE_INTERVAL_MS = 3000L
+
         private val SPEED_REGEX = Regex("""^SPEED\s*:\s*(\d{1,3})$""", RegexOption.IGNORE_CASE)
     }
 
@@ -44,8 +48,16 @@ class ControlViewModel(application: Application) : AndroidViewModel(application)
     /** Repeats the held direction so the firmware watchdog can tell holding from signal loss. */
     private var keepAliveJob: Job? = null
 
+    private var lastNotConnectedNoticeAt = 0L
+
     val connectionState: StateFlow<ConnectionState> = controller.connectionState
     val connectedDeviceName: StateFlow<String?> = controller.connectedDeviceName
+
+    /** Wire monitor, surfaced in the header so the link can be checked without a laptop. */
+    val lastSent: StateFlow<Pair<Char, Long>?> = controller.lastSent
+
+    private val _lastReceived = MutableStateFlow<String?>(null)
+    val lastReceived: StateFlow<String?> = _lastReceived.asStateFlow()
 
     private val _speed = MutableStateFlow(DEFAULT_SPEED)
     val speed: StateFlow<Int> = _speed.asStateFlow()
@@ -94,6 +106,7 @@ class ControlViewModel(application: Application) : AndroidViewModel(application)
 
     /** The car is authoritative about its own PWM, so `SPEED:xxx` overwrites the local value. */
     private fun handleIncomingLine(line: String) {
+        _lastReceived.value = line
         val match = SPEED_REGEX.find(line.trim()) ?: return
         val reported = match.groupValues[1].toIntOrNull() ?: return
         _speed.value = reported.coerceIn(MIN_SPEED, MAX_SPEED)
@@ -207,9 +220,20 @@ class ControlViewModel(application: Application) : AndroidViewModel(application)
         controller.send(Command.SPEED_DOWN)
     }
 
+    /**
+     * Gate for every command that would move the car.
+     *
+     * The "not connected" notice is rate-limited: without this, mashing the pad while
+     * disconnected emits one message per press and buries the UI in identical snackbars.
+     */
     private fun requireConnection(): Boolean {
         if (connectionState.value.isConnected) return true
-        _messages.tryEmit(MESSAGE_NOT_CONNECTED)
+
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastNotConnectedNoticeAt > NOT_CONNECTED_NOTICE_INTERVAL_MS) {
+            lastNotConnectedNoticeAt = now
+            _messages.tryEmit(MESSAGE_NOT_CONNECTED)
+        }
         return false
     }
 

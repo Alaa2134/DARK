@@ -8,6 +8,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -25,6 +26,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -32,7 +34,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -46,6 +51,7 @@ import com.rocketpocket.car.ui.components.BluetoothDeviceDialog
 import com.rocketpocket.car.ui.components.ConnectionStatusPill
 import com.rocketpocket.car.ui.components.DirectionPad
 import com.rocketpocket.car.ui.components.SpeedPanel
+import com.rocketpocket.car.ui.components.TelemetryStrip
 import com.rocketpocket.car.ui.theme.CarbonBlack
 import com.rocketpocket.car.ui.theme.CarbonSurface
 import com.rocketpocket.car.ui.theme.CarbonSurfaceHigh
@@ -54,6 +60,7 @@ import com.rocketpocket.car.ui.theme.NeonRed
 import com.rocketpocket.car.ui.theme.TextPrimary
 import com.rocketpocket.car.ui.theme.TextSecondary
 import com.rocketpocket.car.viewmodel.ControlViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
@@ -77,6 +84,8 @@ fun ControlScreen(viewModel: ControlViewModel) {
     val speed by viewModel.speed.collectAsStateWithLifecycle()
     val pairedDevices by viewModel.pairedDevices.collectAsStateWithLifecycle()
     val showDeviceDialog by viewModel.showDeviceDialog.collectAsStateWithLifecycle()
+    val lastSent by viewModel.lastSent.collectAsStateWithLifecycle()
+    val lastReceived by viewModel.lastReceived.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -93,10 +102,22 @@ fun ControlScreen(viewModel: ControlViewModel) {
         viewModel.openDevicePicker()
     }
 
+    // showSnackbar suspends until the snackbar goes away, so collecting straight into it would
+    // stall this collector and let messages pile up behind it. Each message is instead shown in
+    // its own short-lived job that replaces the previous one, so the newest notice always wins
+    // and a burst of presses can never build a queue.
+    var snackbarJob by remember { mutableStateOf<Job?>(null) }
+    val snackbarScope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         viewModel.messages.collect { message ->
+            snackbarJob?.cancel()
             snackbarHostState.currentSnackbarData?.dismiss()
-            snackbarHostState.showSnackbar(message)
+            snackbarJob = snackbarScope.launch {
+                snackbarHostState.showSnackbar(
+                    message = message,
+                    duration = SnackbarDuration.Short,
+                )
+            }
         }
     }
 
@@ -129,7 +150,17 @@ fun ControlScreen(viewModel: ControlViewModel) {
 
     Scaffold(
         containerColor = CarbonBlack,
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        // Pinned to the top. The Scaffold default is bottom-centre, which in landscape lands
+        // directly on top of the BACKWARD / BACK LEFT / BACK RIGHT buttons — and a Snackbar is a
+        // Surface, so it swallows the touches meant for them.
+        snackbarHost = {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                SnackbarHost(hostState = snackbarHostState)
+            }
+        },
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -144,6 +175,8 @@ fun ControlScreen(viewModel: ControlViewModel) {
             DashboardHeader(
                 connectionState = connectionState,
                 connectedDeviceName = connectedDeviceName,
+                lastSent = lastSent,
+                lastReceived = lastReceived,
                 onConnectClick = {
                     if (connectionState.isConnected) {
                         viewModel.disconnect()
@@ -189,6 +222,8 @@ fun ControlScreen(viewModel: ControlViewModel) {
 private fun DashboardHeader(
     connectionState: ConnectionState,
     connectedDeviceName: String?,
+    lastSent: Pair<Char, Long>?,
+    lastReceived: String?,
     onConnectClick: () -> Unit,
 ) {
     Row(
@@ -216,6 +251,11 @@ private fun DashboardHeader(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            TelemetryStrip(
+                lastSent = lastSent,
+                lastReceived = lastReceived,
+            )
+
             ConnectionStatusPill(
                 state = connectionState,
                 deviceName = connectedDeviceName,
