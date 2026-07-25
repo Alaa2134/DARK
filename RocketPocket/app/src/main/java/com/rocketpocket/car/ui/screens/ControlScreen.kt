@@ -239,29 +239,12 @@ private fun DashboardContent(
                     .padding(top = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                // The two halves slide in from their own edges so the dashboard assembles
-                // itself rather than snapping into place.
-                AnimatedVisibility(
-                    visible = entered,
-                    enter = fadeIn(tween(420)) +
-                        slideInHorizontally(tween(420)) { -it / 3 },
-                    modifier = Modifier
-                        .weight(1.2f)
-                        .fillMaxHeight(),
-                ) {
-                    DirectionPad(
-                        enabled = connectionState.isConnected,
-                        onDirectionPressed = viewModel::onDirectionPressed,
-                        onDirectionReleased = viewModel::onDirectionReleased,
-                        onEmergencyStop = viewModel::onEmergencyStop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-
+                // Speed on the left, drive pad on the right. Each half slides in from its own
+                // edge so the dashboard assembles itself rather than snapping into place.
                 AnimatedVisibility(
                     visible = entered,
                     enter = fadeIn(tween(420, delayMillis = 120)) +
-                        slideInHorizontally(tween(420, delayMillis = 120)) { it / 3 },
+                        slideInHorizontally(tween(420, delayMillis = 120)) { -it / 3 },
                     modifier = Modifier
                         .weight(0.8f)
                         .fillMaxHeight(),
@@ -272,6 +255,23 @@ private fun DashboardContent(
                         connected = connectionState.isConnected,
                         onIncrease = viewModel::increaseSpeed,
                         onDecrease = viewModel::decreaseSpeed,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+
+                AnimatedVisibility(
+                    visible = entered,
+                    enter = fadeIn(tween(420)) +
+                        slideInHorizontally(tween(420)) { it / 3 },
+                    modifier = Modifier
+                        .weight(1.2f)
+                        .fillMaxHeight(),
+                ) {
+                    DirectionPad(
+                        enabled = connectionState.isConnected,
+                        onDirectionPressed = viewModel::onDirectionPressed,
+                        onDirectionReleased = viewModel::onDirectionReleased,
+                        onEmergencyStop = viewModel::onEmergencyStop,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

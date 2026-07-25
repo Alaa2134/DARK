@@ -50,13 +50,33 @@ fun SpeedPanel(
     onDecrease: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // The gauge sits on the left of this panel and the trim buttons stack down its right edge,
-    // which is where the right thumb naturally rests when the phone is held in landscape.
+    // This panel occupies the left half of the dashboard, so the trim buttons stack down its
+    // outer (left) edge where the left thumb rests, and the gauge sits inboard of them. The
+    // right thumb is left free for the drive pad.
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Column(
+            modifier = Modifier.fillMaxHeight(),
+            verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            SpeedTrimButton(
+                icon = Icons.Filled.Add,
+                contentDescription = "Increase speed",
+                accent = NeonCyan,
+                onClick = onIncrease,
+            )
+            SpeedTrimButton(
+                icon = Icons.Filled.Remove,
+                contentDescription = "Decrease speed",
+                accent = NeonRed,
+                onClick = onDecrease,
+            )
+        }
+
         Column(
             modifier = Modifier.weight(1f),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -79,25 +99,6 @@ fun SpeedPanel(
                 text = "STEP 15",
                 style = MaterialTheme.typography.labelSmall,
                 color = TextSecondary,
-            )
-        }
-
-        Column(
-            modifier = Modifier.fillMaxHeight(),
-            verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            SpeedTrimButton(
-                icon = Icons.Filled.Add,
-                contentDescription = "Increase speed",
-                accent = NeonCyan,
-                onClick = onIncrease,
-            )
-            SpeedTrimButton(
-                icon = Icons.Filled.Remove,
-                contentDescription = "Decrease speed",
-                accent = NeonRed,
-                onClick = onDecrease,
             )
         }
     }
