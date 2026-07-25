@@ -139,15 +139,22 @@ lists devices that are already paired.
 
 ## 6. Wiring (L298N)
 
+These are the pins the car is already wired to, carried over from the team's earlier Wi-Fi sketch.
+
 | ESP32 pin | L298N | Purpose |
 |---:|---|---|
-| GPIO 26 | IN1 | left motor direction A |
-| GPIO 27 | IN2 | left motor direction B |
-| GPIO 14 | ENA | left motor PWM |
-| GPIO 33 | IN3 | right motor direction A |
-| GPIO 25 | IN4 | right motor direction B |
-| GPIO 32 | ENB | right motor PWM |
+| GPIO 12 | IN1 | left motor direction A |
+| GPIO 14 | IN2 | left motor direction B |
+| GPIO 13 | ENA | left motor PWM |
+| GPIO 27 | IN3 | right motor direction A |
+| GPIO 26 | IN4 | right motor direction B |
+| GPIO 25 | ENB | right motor PWM |
 | GND | GND | **common ground — required** |
+
+> **GPIO 12 is a strapping pin.** The ESP32 reads it at boot to choose the flash voltage and it
+> must be LOW at that instant. An L298N input floats low, so this normally works — but if
+> flashing fails with a checksum or timeout error, pull the IN1 wire off GPIO 12, flash, and
+> reconnect it.
 
 Power the motors from the battery pack through the L298N, not from the ESP32's 3.3 V pin. Tie the
 battery ground, the L298N ground and the ESP32 ground together, or the signals will float.

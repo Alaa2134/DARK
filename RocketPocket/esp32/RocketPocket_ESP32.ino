@@ -33,18 +33,26 @@ BluetoothSerial SerialBT;
 // ---------------------------------------------------------------------------------------------
 // Wiring — L298N motor driver
 // ---------------------------------------------------------------------------------------------
-const int LEFT_MOTOR_IN1  = 26;   // L298N IN1
-const int LEFT_MOTOR_IN2  = 27;   // L298N IN2
-const int LEFT_MOTOR_PWM  = 14;   // L298N ENA
+// These are the pins the car is physically wired to, taken from the team's earlier Wi-Fi sketch
+// (its "Motor A" is the left side, "Motor B" the right — its turnLeft() drives A backwards and B
+// forwards, which only turns the car left if A is the left wheel).
+const int LEFT_MOTOR_IN1  = 12;   // L298N IN1   (was Motor A)
+const int LEFT_MOTOR_IN2  = 14;   // L298N IN2
+const int LEFT_MOTOR_PWM  = 13;   // L298N ENA
 
-const int RIGHT_MOTOR_IN3 = 33;   // L298N IN3
-const int RIGHT_MOTOR_IN4 = 25;   // L298N IN4
-const int RIGHT_MOTOR_PWM = 32;   // L298N ENB
+const int RIGHT_MOTOR_IN3 = 27;   // L298N IN3   (was Motor B)
+const int RIGHT_MOTOR_IN4 = 26;   // L298N IN4
+const int RIGHT_MOTOR_PWM = 25;   // L298N ENB
+
+// !! GPIO 12 is a strapping pin (MTDI). The ESP32 samples it at boot to pick the flash voltage,
+// and it must read LOW at that moment. An L298N input normally floats low so this works, but if
+// flashing ever fails with a checksum or timeout error, unplug the IN1 wire from GPIO 12, flash,
+// then plug it back in.
 
 // LEDC PWM channels (the ESP32 has no analogWrite). Only used by core 2.x — see below.
 const int LEFT_PWM_CHANNEL  = 0;
 const int RIGHT_PWM_CHANNEL = 1;
-const int PWM_FREQUENCY     = 1000;  // Hz
+const int PWM_FREQUENCY     = 5000;  // Hz — matches the frequency the motors already ran at
 const int PWM_RESOLUTION    = 8;     // bits -> duty range 0..255
 
 // ---------------------------------------------------------------------------------------------
