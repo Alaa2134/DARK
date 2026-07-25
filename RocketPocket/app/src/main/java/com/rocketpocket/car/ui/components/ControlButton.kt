@@ -24,7 +24,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -100,9 +102,31 @@ fun ControlButton(
         else -> TextDisabled
     }
 
+    // Glow spreading out from under a pressed button — the visual "this registered" cue.
+    val glow by animateFloatAsState(
+        targetValue = if (pressed && enabled) 1f else 0f,
+        animationSpec = tween(160),
+        label = "controlButtonGlow",
+    )
+
     Box(
         modifier = modifier
             .scale(scale)
+            .drawBehind {
+                if (glow > 0f) {
+                    drawRoundRect(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                accent.copy(alpha = 0.35f * glow),
+                                accent.copy(alpha = 0f),
+                            ),
+                            center = center,
+                            radius = size.minDimension * (0.55f + 0.35f * glow),
+                        ),
+                        cornerRadius = CornerRadius(22.dp.toPx()),
+                    )
+                }
+            }
             .background(
                 brush = Brush.verticalGradient(
                     listOf(containerColor, containerColor.copy(alpha = 0.65f)),

@@ -3,6 +3,9 @@
     <string name="app_name">Rocket Pocket</string>
     <string name="app_tagline">Bluetooth Racing Car</string>
     <string name="team_name">Team Rocket Pocket</string>
+    <string name="university_name">Horus University of Egypt</string>
+    <string name="faculty_name">Faculty of Artificial Intelligence</string>
+    <string name="faculty_short">Faculty of AI</string>
 
     <string name="car_device_name">Rocket Pocket</string>
 

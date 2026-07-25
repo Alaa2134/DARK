@@ -6,6 +6,10 @@ import android.content.Intent
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,7 +45,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.rocketpocket.car.R
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -55,6 +61,7 @@ import com.rocketpocket.car.ui.components.TelemetryStrip
 import com.rocketpocket.car.ui.theme.CarbonBlack
 import com.rocketpocket.car.ui.theme.CarbonSurface
 import com.rocketpocket.car.ui.theme.CarbonSurfaceHigh
+import com.rocketpocket.car.ui.theme.NeonAmber
 import com.rocketpocket.car.ui.theme.NeonCyan
 import com.rocketpocket.car.ui.theme.NeonRed
 import com.rocketpocket.car.ui.theme.TextPrimary
@@ -88,6 +95,10 @@ fun ControlScreen(viewModel: ControlViewModel) {
     val lastReceived by viewModel.lastReceived.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Drives the one-shot entrance animation for the two dashboard halves.
+    var entered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { entered = true }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
@@ -190,29 +201,45 @@ fun ControlScreen(viewModel: ControlViewModel) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .padding(top = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(18.dp),
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                DirectionPad(
-                    enabled = connectionState.isConnected,
-                    onDirectionPressed = viewModel::onDirectionPressed,
-                    onDirectionReleased = viewModel::onDirectionReleased,
-                    onEmergencyStop = viewModel::onEmergencyStop,
+                // The two halves slide in from their own edges so the dashboard assembles
+                // itself rather than snapping into place.
+                AnimatedVisibility(
+                    visible = entered,
+                    enter = fadeIn(tween(420)) +
+                        slideInHorizontally(tween(420)) { -it / 3 },
                     modifier = Modifier
-                        .weight(1.15f)
+                        .weight(1.2f)
                         .fillMaxHeight(),
-                )
+                ) {
+                    DirectionPad(
+                        enabled = connectionState.isConnected,
+                        onDirectionPressed = viewModel::onDirectionPressed,
+                        onDirectionReleased = viewModel::onDirectionReleased,
+                        onEmergencyStop = viewModel::onEmergencyStop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
 
-                SpeedPanel(
-                    speed = speed,
-                    maxSpeed = ControlViewModel.MAX_SPEED,
-                    connected = connectionState.isConnected,
-                    onIncrease = viewModel::increaseSpeed,
-                    onDecrease = viewModel::decreaseSpeed,
+                AnimatedVisibility(
+                    visible = entered,
+                    enter = fadeIn(tween(420, delayMillis = 120)) +
+                        slideInHorizontally(tween(420, delayMillis = 120)) { it / 3 },
                     modifier = Modifier
-                        .weight(0.85f)
+                        .weight(0.8f)
                         .fillMaxHeight(),
-                )
+                ) {
+                    SpeedPanel(
+                        speed = speed,
+                        maxSpeed = ControlViewModel.MAX_SPEED,
+                        connected = connectionState.isConnected,
+                        onIncrease = viewModel::increaseSpeed,
+                        onDecrease = viewModel::decreaseSpeed,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
         }
     }
@@ -237,13 +264,19 @@ private fun DashboardHeader(
         Column {
             Text(
                 text = "ROCKET POCKET",
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.titleLarge,
                 color = TextPrimary,
             )
             Text(
-                text = "Team Rocket Pocket",
-                style = MaterialTheme.typography.labelMedium,
+                text = stringResource(R.string.team_name),
+                style = MaterialTheme.typography.labelSmall,
                 color = TextSecondary,
+            )
+            Text(
+                text = stringResource(R.string.university_name) +
+                    "  •  " + stringResource(R.string.faculty_short),
+                style = MaterialTheme.typography.labelSmall,
+                color = NeonAmber,
             )
         }
 
@@ -279,9 +312,9 @@ private fun DashboardHeader(
                     modifier = Modifier.size(18.dp),
                 )
                 Text(
-                    text = if (connectionState.isConnected) "DISCONNECT" else "CONNECT BLUETOOTH",
+                    text = if (connectionState.isConnected) "DISCONNECT" else "CONNECT",
                     style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(start = 8.dp),
+                    modifier = Modifier.padding(start = 6.dp),
                 )
             }
         }

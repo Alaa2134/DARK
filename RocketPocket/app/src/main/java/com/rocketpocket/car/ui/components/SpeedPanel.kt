@@ -12,8 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -51,47 +50,54 @@ fun SpeedPanel(
     onDecrease: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
+    // The gauge sits on the left of this panel and the trim buttons stack down its right edge,
+    // which is where the right thumb naturally rests when the phone is held in landscape.
+    Row(
         modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = "SPEED",
-            style = MaterialTheme.typography.labelLarge,
-            color = TextSecondary,
-        )
-
-        Speedometer(
-            speed = speed,
-            maxSpeed = maxSpeed,
-            connected = connected,
-            modifier = Modifier
-                .weight(1f)
-                .aspectRatio(1f),
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier.weight(1f),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
-            SpeedTrimButton(
-                icon = Icons.Filled.Remove,
-                contentDescription = "Decrease speed",
-                accent = NeonRed,
-                onClick = onDecrease,
+            Text(
+                text = "SPEED",
+                style = MaterialTheme.typography.labelLarge,
+                color = TextSecondary,
+            )
+            Speedometer(
+                speed = speed,
+                maxSpeed = maxSpeed,
+                connected = connected,
+                modifier = Modifier
+                    .weight(1f)
+                    .aspectRatio(1f),
             )
             Text(
                 text = "STEP 15",
                 style = MaterialTheme.typography.labelSmall,
                 color = TextSecondary,
             )
+        }
+
+        Column(
+            modifier = Modifier.fillMaxHeight(),
+            verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             SpeedTrimButton(
                 icon = Icons.Filled.Add,
                 contentDescription = "Increase speed",
                 accent = NeonCyan,
                 onClick = onIncrease,
+            )
+            SpeedTrimButton(
+                icon = Icons.Filled.Remove,
+                contentDescription = "Decrease speed",
+                accent = NeonRed,
+                onClick = onDecrease,
             )
         }
     }
@@ -121,10 +127,13 @@ private fun SpeedTrimButton(
 
     Box(
         modifier = modifier
-            .size(56.dp)
+            .size(66.dp)
             .scale(scale)
-            .background(CarbonSurfaceHigh, CircleShape)
-            .border(1.dp, if (pressed) accent else CarbonOutline, CircleShape)
+            .background(
+                if (pressed) accent.copy(alpha = 0.22f) else CarbonSurfaceHigh,
+                CircleShape,
+            )
+            .border(if (pressed) 2.dp else 1.dp, if (pressed) accent else CarbonOutline, CircleShape)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -138,7 +147,7 @@ private fun SpeedTrimButton(
             imageVector = icon,
             contentDescription = contentDescription,
             tint = accent,
-            modifier = Modifier.size(28.dp),
+            modifier = Modifier.size(32.dp),
         )
     }
 }
