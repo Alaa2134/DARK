@@ -106,9 +106,14 @@ const int SPEED_STEP    = 15;    // must match ControlViewModel.SPEED_STEP
 const int MIN_SPEED     = 0;
 const int MAX_SPEED     = 255;
 
-// How hard the inner wheel is driven during a curve. 40% makes the car arc; drop it towards
-// 0 for a tighter turn, raise it towards 100 for a wider one.
-const float CURVE_INNER_RATIO = 0.40f;
+// How hard the inner wheel is driven during a curve. Lower gives a tighter arc, higher a wider
+// one. 55% keeps the inner wheel clearly turning rather than crawling.
+const float CURVE_INNER_RATIO = 0.55f;
+
+// A geared DC motor under load will not start below roughly this duty — it just buzzes and
+// stalls. Curves clamp the inner wheel up to it, so a curve never leaves one side dead and
+// pivoting around a stopped wheel instead of tracing an arc.
+const int MIN_MOVE_DUTY = 80;
 
 int currentSpeed = DEFAULT_SPEED;
 
@@ -169,7 +174,16 @@ void stopMotors() {
 }
 
 int innerWheelDuty() {
-  return (int)(currentSpeed * CURVE_INNER_RATIO);
+  int duty = (int)(currentSpeed * CURVE_INNER_RATIO);
+
+  // Never hand the inner wheel a duty too small to actually turn it. At the default speed of
+  // 150 the raw 55% is 82, but at lower speeds the ratio alone would fall under the motor's
+  // starting threshold. Clamping up to MIN_MOVE_DUTY — capped by the current speed so the
+  // inner wheel can never outrun the outer one — keeps both sides alive through the curve.
+  if (duty < MIN_MOVE_DUTY) {
+    duty = min(MIN_MOVE_DUTY, currentSpeed);
+  }
+  return duty;
 }
 
 // ---------------------------------------------------------------------------------------------
