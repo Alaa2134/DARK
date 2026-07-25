@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Adaptive icon foreground. The car sits inside the inner 72x72 safe zone of the
+    108x108 viewport so no part of it is clipped by a circular or squircle mask.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <group
+        android:scaleX="0.72"
+        android:scaleY="0.72"
+        android:translateX="31"
+        android:translateY="29.5">
+
+        <!-- Rear wing -->
+        <path
+            android:fillColor="#FF7A1A"
+            android:pathData="M48,18 L61,18 L61,22 L48,22 Z" />
+        <path
+            android:fillColor="#FF7A1A"
+            android:pathData="M52,22 L55,22 L55,29 L52,29 Z" />
+
+        <!-- Main body -->
+        <path
+            android:fillColor="#00E5FF"
+            android:pathData="M3,40 L8,31 L21,29 L28,22 L42,22 L49,29 L61,31 L61,40 Z" />
+
+        <!-- Cockpit canopy -->
+        <path
+            android:fillColor="#07090D"
+            android:pathData="M29,27 L31,24 L40,24 L42,27 Z" />
+
+        <!-- Speed stripe -->
+        <path
+            android:fillColor="#FFC531"
+            android:pathData="M8,36 L58,36 L58,38 L8,38 Z" />
+
+        <!-- Front wheel -->
+        <path
+            android:fillColor="#2A3243"
+            android:pathData="M18,42 m-8,0 a8,8 0 1,0 16,0 a8,8 0 1,0 -16,0" />
+        <path
+            android:fillColor="#8B94A8"
+            android:pathData="M18,42 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" />
+
+        <!-- Rear wheel -->
+        <path
+            android:fillColor="#2A3243"
+            android:pathData="M47,42 m-8,0 a8,8 0 1,0 16,0 a8,8 0 1,0 -16,0" />
+        <path
+            android:fillColor="#8B94A8"
+            android:pathData="M47,42 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" />
+
+    </group>
+</vector>

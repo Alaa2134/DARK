@@ -1,0 +1,249 @@
+package com.rocketpocket.car.ui.screens
+
+import android.Manifest
+import android.bluetooth.BluetoothAdapter
+import android.content.Intent
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.LinkOff
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rocketpocket.car.bluetooth.ConnectionState
+import com.rocketpocket.car.ui.components.BluetoothDeviceDialog
+import com.rocketpocket.car.ui.components.ConnectionStatusPill
+import com.rocketpocket.car.ui.components.DirectionPad
+import com.rocketpocket.car.ui.components.SpeedPanel
+import com.rocketpocket.car.ui.theme.CarbonBlack
+import com.rocketpocket.car.ui.theme.CarbonSurface
+import com.rocketpocket.car.ui.theme.CarbonSurfaceHigh
+import com.rocketpocket.car.ui.theme.NeonCyan
+import com.rocketpocket.car.ui.theme.NeonRed
+import com.rocketpocket.car.ui.theme.TextPrimary
+import com.rocketpocket.car.ui.theme.TextSecondary
+import com.rocketpocket.car.viewmodel.ControlViewModel
+import kotlinx.coroutines.launch
+
+/**
+ * The permissions the Connect button needs, which differ sharply either side of Android 12.
+ *
+ * On API 31+ the Bluetooth permissions are their own runtime group and carry
+ * `neverForLocation`, so no location prompt appears. On API 30 and below the platform gates
+ * bonded-device access behind location instead.
+ */
+private val requiredPermissions: Array<String> =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN)
+    } else {
+        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+    }
+
+@Composable
+fun ControlScreen(viewModel: ControlViewModel) {
+    val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
+    val connectedDeviceName by viewModel.connectedDeviceName.collectAsStateWithLifecycle()
+    val speed by viewModel.speed.collectAsStateWithLifecycle()
+    val pairedDevices by viewModel.pairedDevices.collectAsStateWithLifecycle()
+    val showDeviceDialog by viewModel.showDeviceDialog.collectAsStateWithLifecycle()
+
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+    ) { grants ->
+        if (grants.values.all { it }) viewModel.openDevicePicker() else viewModel.onPermissionsDenied()
+    }
+
+    val enableBluetoothLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) {
+        // Whatever the user chose, re-check: openDevicePicker reports the state itself.
+        viewModel.openDevicePicker()
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.messages.collect { message ->
+            snackbarHostState.currentSnackbarData?.dismiss()
+            snackbarHostState.showSnackbar(message)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.requestEnableBluetooth.collect {
+            enableBluetoothLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+        }
+    }
+
+    // Backstop for the activity-level onPause/onStop: whenever the dashboard stops being
+    // visible, the car gets a stop command.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) {
+                viewModel.onAppLeftForeground()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    if (showDeviceDialog) {
+        BluetoothDeviceDialog(
+            devices = pairedDevices,
+            onSelect = viewModel::connectTo,
+            onDismiss = viewModel::dismissDevicePicker,
+        )
+    }
+
+    Scaffold(
+        containerColor = CarbonBlack,
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(listOf(CarbonSurface, CarbonBlack)),
+                )
+                .padding(innerPadding)
+                .systemBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        ) {
+            DashboardHeader(
+                connectionState = connectionState,
+                connectedDeviceName = connectedDeviceName,
+                onConnectClick = {
+                    if (connectionState.isConnected) {
+                        viewModel.disconnect()
+                    } else {
+                        permissionLauncher.launch(requiredPermissions)
+                    }
+                },
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(top = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                DirectionPad(
+                    enabled = connectionState.isConnected,
+                    onDirectionPressed = viewModel::onDirectionPressed,
+                    onDirectionReleased = viewModel::onDirectionReleased,
+                    onEmergencyStop = viewModel::onEmergencyStop,
+                    modifier = Modifier
+                        .weight(1.15f)
+                        .fillMaxHeight(),
+                )
+
+                SpeedPanel(
+                    speed = speed,
+                    maxSpeed = ControlViewModel.MAX_SPEED,
+                    connected = connectionState.isConnected,
+                    onIncrease = viewModel::increaseSpeed,
+                    onDecrease = viewModel::decreaseSpeed,
+                    modifier = Modifier
+                        .weight(0.85f)
+                        .fillMaxHeight(),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DashboardHeader(
+    connectionState: ConnectionState,
+    connectedDeviceName: String?,
+    onConnectClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(CarbonSurfaceHigh.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column {
+            Text(
+                text = "ROCKET POCKET",
+                style = MaterialTheme.typography.headlineMedium,
+                color = TextPrimary,
+            )
+            Text(
+                text = "Team Rocket Pocket",
+                style = MaterialTheme.typography.labelMedium,
+                color = TextSecondary,
+            )
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            ConnectionStatusPill(
+                state = connectionState,
+                deviceName = connectedDeviceName,
+            )
+
+            Button(
+                onClick = onConnectClick,
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (connectionState.isConnected) NeonRed else NeonCyan,
+                    contentColor = CarbonBlack,
+                ),
+            ) {
+                Icon(
+                    imageVector = if (connectionState.isConnected) {
+                        Icons.Filled.LinkOff
+                    } else {
+                        Icons.Filled.Bluetooth
+                    },
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text(
+                    text = if (connectionState.isConnected) "DISCONNECT" else "CONNECT BLUETOOTH",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+        }
+    }
+}

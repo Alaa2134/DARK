@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Rocket Pocket</string>
+    <string name="app_tagline">Bluetooth Racing Car</string>
+    <string name="team_name">Team Rocket Pocket</string>
+
+    <string name="car_device_name">Rocket Pocket</string>
+
+    <string name="connect_bluetooth">CONNECT BLUETOOTH</string>
+    <string name="disconnect">DISCONNECT</string>
+    <string name="paired_devices">Paired Devices</string>
+    <string name="cancel">CANCEL</string>
+
+    <string name="status_disconnected">DISCONNECTED</string>
+    <string name="status_connecting">CONNECTING…</string>
+    <string name="status_connected">CONNECTED</string>
+
+    <string name="msg_not_connected">Connect to Rocket Pocket first</string>
+    <string name="msg_connection_lost">Bluetooth Connection Lost</string>
+
+    <string name="btn_forward">FORWARD</string>
+    <string name="btn_backward">BACKWARD</string>
+    <string name="btn_left">LEFT</string>
+    <string name="btn_right">RIGHT</string>
+    <string name="btn_forward_left">FWD LEFT</string>
+    <string name="btn_forward_right">FWD RIGHT</string>
+    <string name="btn_backward_left">BACK LEFT</string>
+    <string name="btn_backward_right">BACK RIGHT</string>
+    <string name="btn_emergency_stop">EMERGENCY STOP</string>
+
+    <string name="speed">SPEED</string>
+    <string name="speed_step">STEP 15</string>
+    <string name="increase_speed">Increase speed</string>
+    <string name="decrease_speed">Decrease speed</string>
+</resources>

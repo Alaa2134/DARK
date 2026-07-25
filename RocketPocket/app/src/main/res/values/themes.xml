@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+        The Compose theme in Theme.kt owns the real colours; this XML theme only has to hand
+        the window over without a light-mode flash before the first frame.
+    -->
+    <style name="Theme.RocketPocket" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/carbon_black</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+    </style>
+
+</resources>

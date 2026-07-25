@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The app keeps no persistent user data — the connection and speed live only in memory —
+    so there is nothing to include in a backup.
+-->
+<full-backup-content />
