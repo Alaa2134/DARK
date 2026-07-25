@@ -35,6 +35,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,7 +46,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.rocketpocket.car.R
 import androidx.lifecycle.Lifecycle
@@ -159,6 +162,44 @@ fun ControlScreen(viewModel: ControlViewModel) {
         )
     }
 
+    // The dashboard is a physical control surface, not a document: LEFT must be on the left of
+    // the pad no matter what language the phone is in. On an Arabic device the layout direction
+    // is RTL and every Row mirrors, which put FWD RIGHT where FWD LEFT belongs and moved the
+    // speedometer to the wrong side. Pinning this subtree to LTR keeps the geometry fixed while
+    // leaving the rest of the system's RTL behaviour alone.
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        DashboardContent(
+            connectionState = connectionState,
+            connectedDeviceName = connectedDeviceName,
+            speed = speed,
+            lastSent = lastSent,
+            lastReceived = lastReceived,
+            entered = entered,
+            snackbarHostState = snackbarHostState,
+            viewModel = viewModel,
+            onConnectClick = {
+                if (connectionState.isConnected) {
+                    viewModel.disconnect()
+                } else {
+                    permissionLauncher.launch(requiredPermissions)
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun DashboardContent(
+    connectionState: ConnectionState,
+    connectedDeviceName: String?,
+    speed: Int,
+    lastSent: Pair<Char, Long>?,
+    lastReceived: String?,
+    entered: Boolean,
+    snackbarHostState: SnackbarHostState,
+    viewModel: ControlViewModel,
+    onConnectClick: () -> Unit,
+) {
     Scaffold(
         containerColor = CarbonBlack,
         // Pinned to the top. The Scaffold default is bottom-centre, which in landscape lands
@@ -188,13 +229,7 @@ fun ControlScreen(viewModel: ControlViewModel) {
                 connectedDeviceName = connectedDeviceName,
                 lastSent = lastSent,
                 lastReceived = lastReceived,
-                onConnectClick = {
-                    if (connectionState.isConnected) {
-                        viewModel.disconnect()
-                    } else {
-                        permissionLauncher.launch(requiredPermissions)
-                    }
-                },
+                onConnectClick = onConnectClick,
             )
 
             Row(
