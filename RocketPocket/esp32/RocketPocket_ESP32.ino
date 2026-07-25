@@ -40,11 +40,40 @@ const int RIGHT_MOTOR_IN3 = 33;   // L298N IN3
 const int RIGHT_MOTOR_IN4 = 25;   // L298N IN4
 const int RIGHT_MOTOR_PWM = 32;   // L298N ENB
 
-// LEDC PWM channels (the ESP32 has no analogWrite).
+// LEDC PWM channels (the ESP32 has no analogWrite). Only used by core 2.x — see below.
 const int LEFT_PWM_CHANNEL  = 0;
 const int RIGHT_PWM_CHANNEL = 1;
 const int PWM_FREQUENCY     = 1000;  // Hz
 const int PWM_RESOLUTION    = 8;     // bits -> duty range 0..255
+
+// ---------------------------------------------------------------------------------------------
+// LEDC compatibility
+// ---------------------------------------------------------------------------------------------
+// Arduino ESP32 core 3.x reworked the LEDC API: ledcSetup() + ledcAttachPin() were replaced by a
+// single ledcAttach(pin, freq, resolution), and ledcWrite() now takes the *pin* instead of the
+// channel. These two helpers keep the sketch compiling on both 2.x and 3.x — on cores older than
+// 2.0.5, ESP_ARDUINO_VERSION_MAJOR is undefined and the preprocessor treats it as 0, which
+// correctly selects the legacy branch.
+
+static inline void pwmAttach(int pin, int channel) {
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
+  (void)channel;
+  ledcAttach(pin, PWM_FREQUENCY, PWM_RESOLUTION);
+#else
+  ledcSetup(channel, PWM_FREQUENCY, PWM_RESOLUTION);
+  ledcAttachPin(pin, channel);
+#endif
+}
+
+static inline void pwmWrite(int pin, int channel, int duty) {
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
+  (void)channel;
+  ledcWrite(pin, duty);
+#else
+  (void)pin;
+  ledcWrite(channel, duty);
+#endif
+}
 
 // ---------------------------------------------------------------------------------------------
 // Speed
@@ -82,14 +111,14 @@ void driveLeft(int duty) {
   int magnitude = constrain(abs(duty), 0, MAX_SPEED);
   digitalWrite(LEFT_MOTOR_IN1, duty > 0 ? HIGH : LOW);
   digitalWrite(LEFT_MOTOR_IN2, duty < 0 ? HIGH : LOW);
-  ledcWrite(LEFT_PWM_CHANNEL, magnitude);
+  pwmWrite(LEFT_MOTOR_PWM, LEFT_PWM_CHANNEL, magnitude);
 }
 
 void driveRight(int duty) {
   int magnitude = constrain(abs(duty), 0, MAX_SPEED);
   digitalWrite(RIGHT_MOTOR_IN3, duty > 0 ? HIGH : LOW);
   digitalWrite(RIGHT_MOTOR_IN4, duty < 0 ? HIGH : LOW);
-  ledcWrite(RIGHT_PWM_CHANNEL, magnitude);
+  pwmWrite(RIGHT_MOTOR_PWM, RIGHT_PWM_CHANNEL, magnitude);
 }
 
 void drive(int leftDuty, int rightDuty) {
@@ -198,10 +227,8 @@ void setup() {
   pinMode(RIGHT_MOTOR_IN3, OUTPUT);
   pinMode(RIGHT_MOTOR_IN4, OUTPUT);
 
-  ledcSetup(LEFT_PWM_CHANNEL, PWM_FREQUENCY, PWM_RESOLUTION);
-  ledcAttachPin(LEFT_MOTOR_PWM, LEFT_PWM_CHANNEL);
-  ledcSetup(RIGHT_PWM_CHANNEL, PWM_FREQUENCY, PWM_RESOLUTION);
-  ledcAttachPin(RIGHT_MOTOR_PWM, RIGHT_PWM_CHANNEL);
+  pwmAttach(LEFT_MOTOR_PWM, LEFT_PWM_CHANNEL);
+  pwmAttach(RIGHT_MOTOR_PWM, RIGHT_PWM_CHANNEL);
 
   stopMotors();
 
