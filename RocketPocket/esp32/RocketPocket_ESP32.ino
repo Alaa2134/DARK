@@ -166,6 +166,14 @@ void drive(int leftDuty, int rightDuty) {
   Serial.print(leftDuty);
   Serial.print(" R=");
   Serial.println(rightDuty);
+
+  // The same line goes back over Bluetooth, where the app shows it in its RX strip. That turns
+  // the phone into the serial monitor: if this text appears, the car received the command and
+  // drove the motors, so anything still not moving is electrical rather than a lost command.
+  SerialBT.print("ACK L=");
+  SerialBT.print(leftDuty);
+  SerialBT.print(" R=");
+  SerialBT.println(rightDuty);
 }
 
 void stopMotors() {

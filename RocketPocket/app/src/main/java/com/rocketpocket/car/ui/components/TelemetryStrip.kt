@@ -88,7 +88,8 @@ fun TelemetryStrip(
             color = if (lastReceived == null) TextDisabled else TextSecondary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(max = 96.dp),
+            // Wide enough for the car's full "ACK L=150 R=150" reply without truncating it.
+            modifier = Modifier.widthIn(max = 132.dp),
         )
     }
 }
