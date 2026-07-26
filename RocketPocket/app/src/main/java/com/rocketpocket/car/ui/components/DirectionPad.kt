@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -77,6 +79,30 @@ private fun direction(command: Char): Direction = Directions.first { it.command 
  */
 @Composable
 fun DirectionPad(
+    enabled: Boolean,
+    onDirectionPressed: (Char) -> Unit,
+    onDirectionReleased: () -> Unit,
+    onEmergencyStop: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // A 3x3 grid of nine equal cells is square by nature. Letting it stretch to fill a wide
+    // tablet half turned every button into a flat rectangle, so the grid is pinned to a square
+    // sized by the available height and centred in whatever width it is given.
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        PadGrid(
+            enabled = enabled,
+            onDirectionPressed = onDirectionPressed,
+            onDirectionReleased = onDirectionReleased,
+            onEmergencyStop = onEmergencyStop,
+            modifier = Modifier
+                .fillMaxHeight()
+                .aspectRatio(1f, matchHeightConstraintsFirst = true),
+        )
+    }
+}
+
+@Composable
+private fun PadGrid(
     enabled: Boolean,
     onDirectionPressed: (Char) -> Unit,
     onDirectionReleased: () -> Unit,

@@ -91,9 +91,13 @@ fun SpeedPanel(
                 speed = speed,
                 maxSpeed = maxSpeed,
                 connected = connected,
+                // matchHeightConstraintsFirst is essential here. The default matches the width,
+                // which on a wide tablet panel forces a height taller than the row and clips the
+                // bottom of the dial off the screen. Driving from the height keeps the gauge
+                // whole and simply narrower on wide screens.
                 modifier = Modifier
                     .weight(1f)
-                    .aspectRatio(1f),
+                    .aspectRatio(1f, matchHeightConstraintsFirst = true),
             )
             Text(
                 text = "STEP 15",
