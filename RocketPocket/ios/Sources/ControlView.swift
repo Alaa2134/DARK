@@ -32,13 +32,16 @@ struct ControlView: View {
                     .offset(x: entered ? 0 : -60)
                     .opacity(entered ? 1 : 0)
 
+                    // A 3x3 grid of nine equal cells is square by nature. Letting it fill half a
+                    // landscape screen flattened every button into a wide rectangle, so it is
+                    // fitted to a square sized by the available height instead.
                     DirectionPad(
                         enabled: model.bluetooth.connectionState.isConnected,
                         onPress: model.pressDirection,
                         onRelease: model.releaseDirection,
                         onEmergencyStop: model.emergencyStop
                     )
-                    .frame(maxWidth: .infinity)
+                    .aspectRatio(1, contentMode: .fit)
                     .offset(x: entered ? 0 : 60)
                     .opacity(entered ? 1 : 0)
                 }

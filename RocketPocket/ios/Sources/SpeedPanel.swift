@@ -145,7 +145,10 @@ struct SpeedPanel: View {
                     .tracking(1.5)
                     .foregroundColor(Palette.textSecondary)
 
+                // Fit rather than fill: a GeometryReader left to expand stretched the dial into
+                // the surrounding layout and pushed the labels off the bottom of the screen.
                 Speedometer(speed: speed, maxSpeed: maxSpeed, connected: connected)
+                    .aspectRatio(1, contentMode: .fit)
 
                 Text("STEP \(ControlViewModel.speedStep)")
                     .font(.system(size: 9, weight: .medium))
