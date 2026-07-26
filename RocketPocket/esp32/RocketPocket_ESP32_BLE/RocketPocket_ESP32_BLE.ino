@@ -23,7 +23,8 @@
  *   R  spin right              H  backward-left  (curve)
  *   S  stop
  *   +  speed up   (+15)        -  speed down (-15)
- *   T  wiring self-test
+ *   T  wiring self-test  (drives one motor at a time — see the invert flags below)
+ *   D  direction demo    (runs all eight directions in order so a wrong one can be named)
  *
  * Sent back to the app:  SPEED:<0-255>  and  ACK L=<duty> R=<duty>
  */
@@ -67,6 +68,18 @@ const int PWM_RESOLUTION    = 8;
 const bool INVERT_LEFT_MOTOR  = false;
 const bool INVERT_RIGHT_MOTOR = false;
 const bool SWAP_MOTORS        = false;
+
+// Which way a REVERSE curve rotates the car. F, B, L and R are copied from the team's proven
+// Wi-Fi sketch and are not in question; these two are the ones with no prior reference.
+//
+//   true  — J and H steer like a real car reversing: press BACK RIGHT and the rear swings
+//           right, which rotates the car the opposite way round to FWD RIGHT.
+//   false — J and H rotate the car the SAME way as their forward counterparts, so BACK RIGHT
+//           keeps turning clockwise exactly as FWD RIGHT does.
+//
+// Drivers genuinely disagree about which of these feels correct. Flip it if the reverse curves
+// turn the opposite way to what you expect.
+const bool REVERSE_CURVE_STEERS_LIKE_A_CAR = true;
 
 const int DEFAULT_SPEED = 150;
 const int SPEED_STEP    = 15;
@@ -207,6 +220,42 @@ void runSelfTest() {
   lastCommandAt = millis();
 }
 
+void handleCommand(char command);   // defined below; the demo replays real commands
+
+// Runs all eight directions in a fixed order, announcing each before it moves.
+//
+// This exists to settle arguments. Rather than guessing which command feels wrong, put the car
+// on the floor, send 'D', and note which step misbehaves — the answer names the exact command
+// to change. Announcements also go over BLE, so the phone's RX strip can be followed instead of
+// a serial monitor.
+void runDirectionDemo() {
+  struct Step { const char *name; char command; };
+  const Step steps[] = {
+    {"FORWARD",    'F'}, {"BACKWARD",   'B'},
+    {"SPIN LEFT",  'L'}, {"SPIN RIGHT", 'R'},
+    {"FWD LEFT",   'G'}, {"FWD RIGHT",  'I'},
+    {"BACK LEFT",  'H'}, {"BACK RIGHT", 'J'},
+  };
+
+  Serial.println("DIRECTION DEMO: watch which step is wrong, then report it");
+  for (const Step &step : steps) {
+    Serial.print("DEMO: ");
+    Serial.print(step.name);
+    Serial.print("  (");
+    Serial.print(step.command);
+    Serial.println(")");
+    notify(String("DEMO ") + step.name);
+
+    handleCommand(step.command);
+    delay(1200);
+    stopMotors();
+    delay(600);
+  }
+  Serial.println("DIRECTION DEMO: done");
+  notify("DEMO done");
+  lastCommandAt = millis();
+}
+
 // ---------------------------------------------------------------------------------------------
 // Command handling
 // ---------------------------------------------------------------------------------------------
@@ -224,14 +273,23 @@ void handleCommand(char command) {
     case 'R': drive(currentSpeed, -currentSpeed);             break;
     case 'I': drive(currentSpeed, innerWheelDuty());          break;
     case 'G': drive(innerWheelDuty(), currentSpeed);          break;
-    case 'J': drive(-currentSpeed, -innerWheelDuty());        break;
-    case 'H': drive(-innerWheelDuty(), -currentSpeed);        break;
+    case 'J':
+      if (REVERSE_CURVE_STEERS_LIKE_A_CAR) drive(-currentSpeed, -innerWheelDuty());
+      else                                 drive(-innerWheelDuty(), -currentSpeed);
+      break;
+    case 'H':
+      if (REVERSE_CURVE_STEERS_LIKE_A_CAR) drive(-innerWheelDuty(), -currentSpeed);
+      else                                 drive(-currentSpeed, -innerWheelDuty());
+      break;
     case 'S': stopMotors();                                   break;
     case '+': changeSpeed(SPEED_STEP);                        break;
     case '-': changeSpeed(-SPEED_STEP);                       break;
 
     case 'T':
     case 't': runSelfTest();                                  break;
+
+    case 'D':   // direction demo — runs all eight in order so a wrong one can be named
+    case 'd': runDirectionDemo();                             break;
 
     default:
       // Ignore newlines and anything unrecognised.
