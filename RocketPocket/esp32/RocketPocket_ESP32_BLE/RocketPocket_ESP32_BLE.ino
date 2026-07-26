@@ -172,8 +172,36 @@ void drive(int leftDuty, int rightDuty) {
   notify("ACK L=" + String(leftDuty) + " R=" + String(rightDuty));
 }
 
+// Stopping brakes; it does not coast.
+//
+// drive(0, 0) drops the enable pin to zero, which switches the L298N's outputs off and leaves
+// the motor free-wheeling — the car keeps rolling, which is not what an emergency stop means.
+// The team's earlier sketch never zeroed the enable, so both inputs LOW with the enable still
+// high shorted the motor terminals to ground and the car stopped dead. That short-circuit brake
+// was lost when this firmware started zeroing the duty, and it is restored here deliberately.
+//
+// Set this false only if the abrupt stop is hard on the gears and you would rather it rolled.
+const bool BRAKE_ON_STOP = true;
+
+void brakeMotors() {
+  digitalWrite(LEFT_MOTOR_IN1, LOW);
+  digitalWrite(LEFT_MOTOR_IN2, LOW);
+  digitalWrite(RIGHT_MOTOR_IN3, LOW);
+  digitalWrite(RIGHT_MOTOR_IN4, LOW);
+  // Enable held full: the bridge clamps both motor terminals to ground, and that short is what
+  // does the braking. Dropping it to zero here would silently turn the brake back into a coast.
+  pwmWrite(LEFT_MOTOR_PWM, LEFT_PWM_CHANNEL, MAX_SPEED);
+  pwmWrite(RIGHT_MOTOR_PWM, RIGHT_PWM_CHANNEL, MAX_SPEED);
+}
+
 void stopMotors() {
-  drive(0, 0);
+  if (BRAKE_ON_STOP) {
+    brakeMotors();
+    Serial.println("  -> BRAKE");
+    notify("ACK BRAKE");
+  } else {
+    drive(0, 0);
+  }
   isMoving = false;
 }
 
@@ -217,6 +245,14 @@ void runSelfTest() {
 
   stopMotors();
   Serial.println("SELF TEST: done");
+  Serial.println("");
+  Serial.println("  READ THIS FROM THE CAR'S POINT OF VIEW, NOT YOURS.");
+  Serial.println("  Stand BEHIND the car, looking the way its nose points.");
+  Serial.println("  Its left is then your left. Facing the car reverses everything.");
+  Serial.println("");
+  Serial.println("  The 'left motor' step moved the RIGHT wheel  -> SWAP_MOTORS = true");
+  Serial.println("  A wheel turned the wrong way                 -> that motor's INVERT flag = true");
+  Serial.println("  Both wheels turned the wrong way             -> set BOTH invert flags true");
   lastCommandAt = millis();
 }
 
