@@ -213,7 +213,15 @@ jobs:
             *Portrait*) echo "::error::Portrait is allowed; the dashboard is landscape-only"; exit 1 ;;
           esac
 
-          echo "Info.plist verified: Bluetooth usage string present, landscape-only."
+          APP="$(dirname "$PLIST")"
+          for sound in connected disconnected emergency; do
+            if [ ! -f "$APP/$sound.wav" ]; then
+              echo "::error::$sound.wav is missing from the bundle — alerts would be silent"
+              exit 1
+            fi
+          done
+
+          echo "Verified: Bluetooth usage string, landscape-only, all three alert sounds."
           rm -rf verify
 
       - name: Upload the IPA

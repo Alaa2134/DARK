@@ -27,6 +27,10 @@ targets:
     sources:
       - path: Sources
       - path: Assets.xcassets
+      # buildPhase: resources so the WAVs are copied into the bundle rather than treated as
+      # source. Bundle.main.url(forResource:) finds nothing otherwise and the alerts are silent.
+      - path: Resources/Sounds
+        buildPhase: resources
     # Deliberately no `info:` block. That key makes XcodeGen *generate* a plist at the given
     # path, overwriting the committed one — which silently dropped
     # NSBluetoothAlwaysUsageDescription (iOS kills an app that touches CoreBluetooth without

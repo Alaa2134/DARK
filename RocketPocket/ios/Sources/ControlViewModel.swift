@@ -47,6 +47,33 @@ final class ControlViewModel: ObservableObject {
                 self.message = text
             }
             .store(in: &cancellables)
+
+        // Alerts follow the connection state itself rather than message strings, so rewording a
+        // notice can never silently break the sound that goes with it.
+        bluetooth.$connectionState
+            .removeDuplicates()
+            .scan((ConnectionState.disconnected, ConnectionState.disconnected)) { pair, next in
+                (pair.1, next)
+            }
+            .sink { previous, current in
+                switch (previous, current) {
+                case (_, .connected):
+                    SoundPlayer.shared.play(.connected)
+                case (.connected, .disconnected):
+                    // Only a link that was actually up counts as lost; a failed attempt is not.
+                    SoundPlayer.shared.play(.disconnected)
+                default:
+                    break
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    var isMuted: Bool { SoundPlayer.shared.isMuted }
+
+    func toggleMute() {
+        SoundPlayer.shared.isMuted.toggle()
+        objectWillChange.send()
     }
 
     // MARK: - Incoming telemetry
@@ -142,6 +169,7 @@ final class ControlViewModel: ObservableObject {
     func emergencyStop() {
         stopKeepAlive()
         activeCommand = nil
+        SoundPlayer.shared.play(.emergency)
         if bluetooth.send(Command.stop) {
             message = "Emergency stop sent"
         } else {

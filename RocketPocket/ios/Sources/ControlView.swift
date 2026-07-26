@@ -109,10 +109,29 @@ struct ControlView: View {
 
             Spacer()
 
+            MotionIndicator(
+                command: model.activeCommand,
+                connected: model.bluetooth.connectionState.isConnected
+            )
+            .padding(.trailing, 8)
+
             TelemetryStrip(
                 lastSent: model.bluetooth.lastSent,
                 lastReceived: model.bluetooth.lastReceived
             )
+
+            Button(action: model.toggleMute) {
+                Image(systemName: model.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(model.isMuted ? Palette.textDisabled : Palette.neonCyan)
+                    .frame(width: 34, height: 30)
+                    .background(
+                        RoundedRectangle(cornerRadius: 9)
+                            .fill(Palette.carbonSurfaceHigh.opacity(0.55))
+                    )
+            }
+            .accessibilityLabel(model.isMuted ? "Unmute alerts" : "Mute alerts")
+            .padding(.leading, 8)
 
             ConnectionStatusPill(
                 state: model.bluetooth.connectionState,
