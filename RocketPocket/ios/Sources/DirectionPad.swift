@@ -9,16 +9,22 @@ private struct Direction {
     let accent: Color
 }
 
-private let directions: [Character: Direction] = [
-    Command.forwardLeft:   Direction(command: Command.forwardLeft,   label: "FWD LEFT",   rotation: -45,  accent: Palette.neonOrange),
-    Command.forward:       Direction(command: Command.forward,       label: "FORWARD",    rotation: 0,    accent: Palette.neonCyan),
-    Command.forwardRight:  Direction(command: Command.forwardRight,  label: "FWD RIGHT",  rotation: 45,   accent: Palette.neonOrange),
-    Command.left:          Direction(command: Command.left,          label: "LEFT",       rotation: -90,  accent: Palette.neonCyan),
-    Command.right:         Direction(command: Command.right,         label: "RIGHT",      rotation: 90,   accent: Palette.neonCyan),
-    Command.backwardLeft:  Direction(command: Command.backwardLeft,  label: "BACK LEFT",  rotation: -135, accent: Palette.neonOrange),
-    Command.backward:      Direction(command: Command.backward,      label: "BACKWARD",   rotation: 180,  accent: Palette.neonCyan),
-    Command.backwardRight: Direction(command: Command.backwardRight, label: "BACK RIGHT", rotation: 135,  accent: Palette.neonOrange),
-]
+/// Built from PadLayout rather than restated here. Keeping a second copy of the rotations in the
+/// view is how a cell ends up labelled LEFT while its arrow points somewhere else: both lists
+/// compile perfectly whether or not they still agree.
+private func padDirection(for command: Character) -> Direction {
+    let isDiagonal = [
+        Command.forwardLeft, Command.forwardRight,
+        Command.backwardLeft, Command.backwardRight,
+    ].contains(command)
+
+    return Direction(
+        command: command,
+        label: PadLayout.label(for: command),
+        rotation: PadLayout.rotation(for: command),
+        accent: isDiagonal ? Palette.neonOrange : Palette.neonCyan
+    )
+}
 
 /// The eight-way drive pad with the emergency stop in the centre cell.
 struct DirectionPad: View {
@@ -27,25 +33,23 @@ struct DirectionPad: View {
     let onRelease: () -> Void
     let onEmergencyStop: () -> Void
 
-    private let rows: [[Character?]] = [
-        [Command.forwardLeft, Command.forward, Command.forwardRight],
-        [Command.left, nil, Command.right],
-        [Command.backwardLeft, Command.backward, Command.backwardRight],
-    ]
+    /// From PadLayout so the grid the tests assert on is the grid that actually renders.
+    private let rows = PadLayout.rows
 
     var body: some View {
         VStack(spacing: 10) {
             ForEach(0..<3, id: \.self) { row in
                 HStack(spacing: 10) {
                     ForEach(0..<3, id: \.self) { column in
-                        if let command = rows[row][column], let direction = directions[command] {
+                        if let command = rows[row][column] {
+                            let spec = padDirection(for: command)
                             ControlButton(
-                                label: direction.label,
+                                label: spec.label,
                                 systemImage: "arrow.up",
-                                rotation: direction.rotation,
-                                accent: direction.accent,
+                                rotation: spec.rotation,
+                                accent: spec.accent,
                                 enabled: enabled,
-                                onPress: { onPress(direction.command) },
+                                onPress: { onPress(spec.command) },
                                 onRelease: onRelease
                             )
                         } else {
