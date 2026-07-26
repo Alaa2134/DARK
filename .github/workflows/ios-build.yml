@@ -188,6 +188,34 @@ jobs:
           zip -qry RocketPocket.ipa Payload
           ls -lh RocketPocket.ipa
 
+      # The plist inside the .app is what actually ships, and it is not the file in the repo —
+      # a misconfigured project can silently replace it. A build missing the Bluetooth usage
+      # string installs fine and then gets killed by iOS the moment it scans, so this is checked
+      # on the packaged artifact rather than trusted.
+      - name: Verify the shipped Info.plist
+        working-directory: RocketPocket/ios
+        run: |
+          set -euo pipefail
+          rm -rf verify && mkdir verify
+          unzip -q RocketPocket.ipa -d verify
+          PLIST="$(find verify/Payload -maxdepth 2 -name Info.plist | head -n 1)"
+          test -n "$PLIST" || { echo "No Info.plist inside the IPA"; exit 1; }
+
+          for key in NSBluetoothAlwaysUsageDescription UISupportedInterfaceOrientations; do
+            if ! /usr/libexec/PlistBuddy -c "Print :$key" "$PLIST" >/dev/null 2>&1; then
+              echo "::error::$key is missing from the shipped Info.plist"
+              exit 1
+            fi
+          done
+
+          ORIENTATIONS="$(/usr/libexec/PlistBuddy -c 'Print :UISupportedInterfaceOrientations' "$PLIST")"
+          case "$ORIENTATIONS" in
+            *Portrait*) echo "::error::Portrait is allowed; the dashboard is landscape-only"; exit 1 ;;
+          esac
+
+          echo "Info.plist verified: Bluetooth usage string present, landscape-only."
+          rm -rf verify
+
       - name: Upload the IPA
         uses: actions/upload-artifact@v4
         with:

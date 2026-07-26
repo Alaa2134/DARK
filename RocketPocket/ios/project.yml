@@ -27,8 +27,11 @@ targets:
     sources:
       - path: Sources
       - path: Assets.xcassets
-    info:
-      path: Info.plist
+    # Deliberately no `info:` block. That key makes XcodeGen *generate* a plist at the given
+    # path, overwriting the committed one — which silently dropped
+    # NSBluetoothAlwaysUsageDescription (iOS kills an app that touches CoreBluetooth without
+    # it), the landscape lock and the launch screen. INFOPLIST_FILE below points the build at
+    # the real file instead.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.rocketpocket.car
