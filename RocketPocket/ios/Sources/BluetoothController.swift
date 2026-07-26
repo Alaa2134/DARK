@@ -10,7 +10,9 @@ import Foundation
 @MainActor
 final class BluetoothController: NSObject, ObservableObject {
 
-    static let carName = "Rocket Pocket"
+    // nonisolated because DiscoveredCar.isRocketPocket compares against it outside the main
+    // actor. Left isolated it is only a warning today, but an error under Swift 6.
+    nonisolated static let carName = "Rocket Pocket"
 
     /// Nordic UART Service. RX/TX are named from the car's point of view: the phone writes to
     /// RX, and the car sends its telemetry as notifications on TX.

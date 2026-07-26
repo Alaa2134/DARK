@@ -123,7 +123,6 @@ final class ControlViewModel: ObservableObject {
     /// firmware watchdog: stop arriving, and the ESP32 cuts the motors within a second.
     private func startKeepAlive(_ command: Character) {
         keepAliveTask?.cancel()
-        lastPressActivity = Date()
         keepAliveTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: UInt64(Self.keepAliveInterval * 1_000_000_000))
