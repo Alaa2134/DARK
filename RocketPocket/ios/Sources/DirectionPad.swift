@@ -116,26 +116,17 @@ struct ControlButton: View {
         .scaleEffect(pressed ? 0.92 : 1)
         .animation(.spring(response: 0.18, dampingFraction: 0.55), value: pressed)
         .contentShape(Rectangle())
-        .gesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in
-                    guard !pressed else { return }   // onChanged repeats while the finger moves
-                    pressed = true
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    onPress()
-                }
-                .onEnded { _ in
-                    pressed = false
-                    onRelease()
-                }
-        )
-        .onDisappear {
-            // The view going away mid-press must not leave the car running.
-            if pressed {
+        .onPressGesture(
+            onPress: {
+                pressed = true
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                onPress()
+            },
+            onRelease: {
                 pressed = false
                 onRelease()
             }
-        }
+        )
     }
 }
 
@@ -164,15 +155,15 @@ struct EmergencyStopButton: View {
         .scaleEffect(pressed ? 0.90 : 1)
         .animation(.spring(response: 0.18, dampingFraction: 0.5), value: pressed)
         .contentShape(Circle())
-        .gesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in
-                    guard !pressed else { return }
-                    pressed = true
-                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
-                    onStop()
-                }
-                .onEnded { _ in pressed = false }
+        .onPressGesture(
+            onPress: {
+                pressed = true
+                // .error rather than .warning: the strongest pattern iOS offers, so the stop is
+                // unmistakable through a hand that is watching the car, not the screen.
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                onStop()
+            },
+            onRelease: { pressed = false }
         )
     }
 }

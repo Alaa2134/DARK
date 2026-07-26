@@ -70,7 +70,10 @@ struct ControlView: View {
         }
         .animation(.easeOut(duration: 0.42), value: entered)
         .animation(.easeInOut(duration: 0.25), value: model.message)
-        .onAppear { entered = true }
+        .onAppear {
+            entered = true
+            model.attemptAutoConnect()
+        }
         .onChange(of: model.message) { newValue in
             guard newValue != nil else { return }
             // Auto-dismiss. Replacing rather than queueing keeps a burst of presses from
@@ -113,7 +116,8 @@ struct ControlView: View {
 
             ConnectionStatusPill(
                 state: model.bluetooth.connectionState,
-                deviceName: model.bluetooth.connectedCarName
+                deviceName: model.bluetooth.connectedCarName,
+                rssi: model.bluetooth.rssi
             )
             .padding(.horizontal, 10)
 
@@ -144,6 +148,7 @@ struct ControlView: View {
 struct ConnectionStatusPill: View {
     let state: ConnectionState
     let deviceName: String?
+    var rssi: Int?
 
     @State private var pulse = false
 
@@ -152,6 +157,22 @@ struct ConnectionStatusPill: View {
             return "CONNECTED  •  \(name.uppercased())"
         }
         return state.label
+    }
+
+    /// Driving out of range is the likeliest way to lose the car, so the link is shown as bars
+    /// and goes amber while there is still time to walk back towards it.
+    private var signalBars: Int {
+        guard let rssi else { return 0 }
+        switch rssi {
+        case (-60)...: return 4
+        case (-70)..<(-60): return 3
+        case (-80)..<(-70): return 2
+        default: return 1
+        }
+    }
+
+    private var signalColour: Color {
+        signalBars <= 2 ? Palette.neonAmber : Palette.neonGreen
     }
 
     var body: some View {
@@ -163,6 +184,17 @@ struct ConnectionStatusPill: View {
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(1)
                 .lineLimit(1)
+
+            if state == .connected, rssi != nil {
+                HStack(alignment: .bottom, spacing: 1.5) {
+                    ForEach(1...4, id: \.self) { bar in
+                        RoundedRectangle(cornerRadius: 0.5)
+                            .fill(bar <= signalBars ? signalColour : Palette.textDisabled)
+                            .frame(width: 2.5, height: CGFloat(bar) * 2.6 + 2)
+                    }
+                }
+                .accessibilityLabel("Signal \(signalBars) of 4")
+            }
         }
         .foregroundColor(colour)
         .padding(.horizontal, 12)

@@ -164,7 +164,30 @@ private struct SpeedTrimButton: View {
     let accent: Color
     let action: () -> Void
 
+    /// Holding beats tapping: 150 to 255 is seven separate taps otherwise, which is far too slow
+    /// to adjust between corners. A short lead-in keeps a deliberate single tap from repeating.
+    private static let repeatDelay: TimeInterval = 0.35
+    private static let repeatInterval: TimeInterval = 0.15
+
     @State private var pressed = false
+    @State private var repeatTask: Task<Void, Never>?
+
+    private func startRepeating() {
+        repeatTask?.cancel()
+        repeatTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(Self.repeatDelay * 1_000_000_000))
+            while !Task.isCancelled {
+                action()
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                try? await Task.sleep(nanoseconds: UInt64(Self.repeatInterval * 1_000_000_000))
+            }
+        }
+    }
+
+    private func stopRepeating() {
+        repeatTask?.cancel()
+        repeatTask = nil
+    }
 
     var body: some View {
         Image(systemName: systemImage)
@@ -176,16 +199,19 @@ private struct SpeedTrimButton: View {
             .scaleEffect(pressed ? 0.88 : 1)
             .animation(.spring(response: 0.18, dampingFraction: 0.5), value: pressed)
             .contentShape(Circle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in
-                        guard !pressed else { return }
-                        pressed = true
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        action()
-                    }
-                    .onEnded { _ in pressed = false }
+            .onPressGesture(
+                onPress: {
+                    pressed = true
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    action()
+                    startRepeating()
+                },
+                onRelease: {
+                    pressed = false
+                    stopRepeating()
+                }
             )
+            .onDisappear { stopRepeating() }
     }
 }
 

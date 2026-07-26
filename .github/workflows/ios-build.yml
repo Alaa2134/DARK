@@ -46,6 +46,29 @@ jobs:
           sed -i '' "s|PRODUCT_BUNDLE_IDENTIFIER: .*|PRODUCT_BUNDLE_IDENTIFIER: $BUNDLE_ID|" project.yml
           xcodegen generate
 
+      # Runs before either build path: a logic regression should fail the job rather than ship
+      # in an IPA. The simulator needs no signing, so this works with or without a certificate.
+      - name: Run the unit tests
+        working-directory: RocketPocket/ios
+        run: |
+          set -euo pipefail
+          # Resolve a real simulator rather than hard-coding a model name: the runner image
+          # changes its bundled devices over time, and a stale name fails the job for a reason
+          # that has nothing to do with the code. Retrying a different name would be worse — it
+          # could mask an actual test failure — so this picks one device and runs once.
+          UDID="$(xcrun simctl list devices available \
+            | grep -E '^ +iPhone' \
+            | head -n 1 \
+            | grep -oE '[0-9A-Fa-f-]{36}')"
+          test -n "$UDID" || { echo "No iPhone simulator available on this runner"; exit 1; }
+          echo "Testing on simulator $UDID"
+
+          xcodebuild test \
+            -project RocketPocket.xcodeproj \
+            -scheme RocketPocket \
+            -destination "id=$UDID" \
+            CODE_SIGNING_ALLOWED=NO
+
       # ---------------------------------------------------------------------------------------
       # Signed path — needs IOS_CERT_P12_BASE64, IOS_CERT_PASSWORD,
       # IOS_PROVISIONING_PROFILE_BASE64 and IOS_TEAM_ID in the repository secrets.

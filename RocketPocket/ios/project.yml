@@ -39,3 +39,27 @@ targets:
         # Without this the asset catalog is compiled but no icon is assigned, and the app
         # installs with a blank tile on the home screen.
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+
+  RocketPocketTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: RocketPocket
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.rocketpocket.car.tests
+        GENERATE_INFOPLIST_FILE: "YES"
+
+schemes:
+  RocketPocket:
+    build:
+      targets:
+        RocketPocket: all
+        RocketPocketTests: [test]
+    test:
+      targets:
+        - RocketPocketTests
+    run:
+      config: Debug

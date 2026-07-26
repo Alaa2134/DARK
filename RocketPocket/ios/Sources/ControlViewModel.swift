@@ -7,10 +7,10 @@ import SwiftUI
 @MainActor
 final class ControlViewModel: ObservableObject {
 
-    static let defaultSpeed = 150
-    static let speedStep = 15
-    static let minSpeed = 0
-    static let maxSpeed = 255
+    static let defaultSpeed = SpeedTelemetry.defaultSpeed
+    static let speedStep = SpeedTelemetry.step
+    static let minSpeed = SpeedTelemetry.minSpeed
+    static let maxSpeed = SpeedTelemetry.maxSpeed
 
     static let notConnectedMessage = "Connect to Rocket Pocket first"
 
@@ -30,11 +30,6 @@ final class ControlViewModel: ObservableObject {
     private var keepAliveTask: Task<Void, Never>?
     private var lastNoticeAt: Date = .distantPast
     private var cancellables = Set<AnyCancellable>()
-
-    private static let speedPattern = try? NSRegularExpression(
-        pattern: "^SPEED\\s*:\\s*(\\d{1,3})$",
-        options: .caseInsensitive
-    )
 
     init() {
         bluetooth.$lastReceived
@@ -58,13 +53,8 @@ final class ControlViewModel: ObservableObject {
 
     /// The car is authoritative about its own PWM, so `SPEED:xxx` overwrites the local value.
     private func handle(line: String) {
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
-        let range = NSRange(trimmed.startIndex..., in: trimmed)
-        guard let match = Self.speedPattern?.firstMatch(in: trimmed, range: range),
-              let digits = Range(match.range(at: 1), in: trimmed),
-              let value = Int(trimmed[digits])
-        else { return }
-        speed = min(max(value, Self.minSpeed), Self.maxSpeed)
+        guard let value = SpeedTelemetry.parse(line) else { return }
+        speed = value
     }
 
     // MARK: - Connection
@@ -81,6 +71,26 @@ final class ControlViewModel: ObservableObject {
     func connect(to car: DiscoveredCar) {
         showDevicePicker = false
         bluetooth.connect(to: car)
+    }
+
+    /// Called when the dashboard appears. Reconnecting to the car this phone last drove makes
+    /// the app race-ready on launch without anyone opening the picker.
+    func attemptAutoConnect() {
+        bluetooth.reconnectToLastCar()
+    }
+
+    /// Jumps straight to a speed instead of stepping there one press at a time.
+    func setSpeed(_ target: Int) {
+        guard requireConnection() else { return }
+        let clamped = min(max(target, Self.minSpeed), Self.maxSpeed)
+        // The car only understands + and -, so walk it there in the steps it does understand.
+        let difference = clamped - speed
+        let steps = abs(difference) / Self.speedStep
+        guard steps > 0 else { return }
+        let character = difference > 0 ? Command.speedUp : Command.speedDown
+        for _ in 0..<steps { bluetooth.send(character) }
+        speed = min(max(speed + (difference > 0 ? steps : -steps) * Self.speedStep,
+                        Self.minSpeed), Self.maxSpeed)
     }
 
     func disconnect() {
@@ -113,11 +123,13 @@ final class ControlViewModel: ObservableObject {
     /// firmware watchdog: stop arriving, and the ESP32 cuts the motors within a second.
     private func startKeepAlive(_ command: Character) {
         keepAliveTask?.cancel()
+        lastPressActivity = Date()
         keepAliveTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: UInt64(Self.keepAliveInterval * 1_000_000_000))
                 guard let self, !Task.isCancelled else { return }
                 guard self.bluetooth.connectionState.isConnected else { return }
+
                 self.bluetooth.send(command)
             }
         }

@@ -30,6 +30,10 @@ final class BluetoothController: NSObject, ObservableObject {
     @Published private(set) var lastSent: (character: Character, counter: UInt64)?
     @Published private(set) var lastReceived: String?
 
+    /// Signal strength of the live link, in dBm. Weak signal is the most likely way to lose the
+    /// car mid-run, so it is surfaced rather than left invisible.
+    @Published private(set) var rssi: Int?
+
     let messages = PassthroughSubject<String, Never>()
 
     private var central: CBCentralManager!
@@ -39,6 +43,22 @@ final class BluetoothController: NSObject, ObservableObject {
     private var sendCounter: UInt64 = 0
     private var lineBuffer = ""
     private var peripherals: [UUID: CBPeripheral] = [:]
+
+    private var connectTimeoutTask: Task<Void, Never>?
+    private var rssiTask: Task<Void, Never>?
+    private var reconnectTask: Task<Void, Never>?
+
+    /// CoreBluetooth's connect() never times out on its own, so a car switched off mid-handshake
+    /// would otherwise leave the UI stuck on "CONNECTING…" indefinitely.
+    private static let connectTimeout: TimeInterval = 10
+
+    private static let lastCarKey = "rocketpocket.lastCarIdentifier"
+
+    /// The car this app last drove, so it can be reconnected without scanning for it again.
+    private var lastCarIdentifier: UUID? {
+        get { UserDefaults.standard.string(forKey: Self.lastCarKey).flatMap(UUID.init(uuidString:)) }
+        set { UserDefaults.standard.set(newValue?.uuidString, forKey: Self.lastCarKey) }
+    }
 
     override init() {
         super.init()
@@ -84,16 +104,45 @@ final class BluetoothController: NSObject, ObservableObject {
 
     func connect(to car: DiscoveredCar) {
         guard let peripheral = peripherals[car.id] else { return }
-        stopScan()
-        connectionState = .connecting
-        connectedCarName = car.name
-        self.car = peripheral
-        peripheral.delegate = self
-        central.connect(peripheral, options: nil)
+        connect(peripheral: peripheral, name: car.name)
     }
 
+    private func connect(peripheral: CBPeripheral, name: String) {
+        stopScan()
+        connectionState = .connecting
+        connectedCarName = name
+        car = peripheral
+        peripheral.delegate = self
+        central.connect(peripheral, options: nil)
+
+        connectTimeoutTask?.cancel()
+        connectTimeoutTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(Self.connectTimeout * 1_000_000_000))
+            guard let self, !Task.isCancelled, self.connectionState == .connecting else { return }
+            self.central.cancelPeripheralConnection(peripheral)
+            self.teardown()
+            self.messages.send("Could not reach the car — is it powered on?")
+        }
+    }
+
+    /// Reconnects to the car this app last drove, with no scan at all. CoreBluetooth remembers
+    /// peripherals by identifier, so this is near-instant compared with discovering it again.
+    func reconnectToLastCar() {
+        guard central.state == .poweredOn,
+              connectionState == .disconnected,
+              let identifier = lastCarIdentifier,
+              let peripheral = central.retrievePeripherals(withIdentifiers: [identifier]).first
+        else { return }
+        connect(peripheral: peripheral, name: peripheral.name ?? Self.carName)
+    }
+
+    /// A user-requested disconnect is final — it must not trigger the auto-reconnect that an
+    /// unexpected drop does, or the app would fight the user's decision to stop driving.
     func disconnect() {
         sendImmediately(Command.stop)
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        lastCarIdentifier = nil
         if let peripheral = car {
             central.cancelPeripheralConnection(peripheral)
         }
@@ -102,11 +151,45 @@ final class BluetoothController: NSObject, ObservableObject {
     }
 
     private func teardown() {
+        connectTimeoutTask?.cancel()
+        connectTimeoutTask = nil
+        rssiTask?.cancel()
+        rssiTask = nil
         rxCharacteristic = nil
         car = nil
         connectionState = .disconnected
         connectedCarName = nil
         lineBuffer = ""
+        rssi = nil
+    }
+
+    /// Retries a dropped link a few times with a widening gap, then gives up rather than looping
+    /// forever and draining the phone while the car sits switched off.
+    private func scheduleReconnect() {
+        guard lastCarIdentifier != nil else { return }
+        reconnectTask?.cancel()
+        reconnectTask = Task { [weak self] in
+            for delay in [1.0, 2.0, 4.0, 8.0, 15.0] {
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                guard let self, !Task.isCancelled else { return }
+                guard self.connectionState == .disconnected else { return }
+                self.reconnectToLastCar()
+                // Give the attempt time to resolve before trying again.
+                try? await Task.sleep(nanoseconds: UInt64(Self.connectTimeout * 1_000_000_000))
+                if self.connectionState.isConnected { return }
+            }
+        }
+    }
+
+    private func startRssiPolling(_ peripheral: CBPeripheral) {
+        rssiTask?.cancel()
+        rssiTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self, self.connectionState.isConnected else { return }
+                peripheral.readRSSI()
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+            }
+        }
     }
 
     // MARK: - Sending
@@ -221,6 +304,9 @@ extension BluetoothController: CBCentralManagerDelegate {
             guard self.connectionState != .disconnected else { return }
             self.teardown()
             self.messages.send(Self.connectionLostMessage)
+            // An unexpected drop — a flat battery, a knock, driving out of range — is exactly
+            // the case worth retrying without making the user open the picker mid-race.
+            self.scheduleReconnect()
         }
     }
 }
@@ -257,11 +343,25 @@ extension BluetoothController: CBPeripheralDelegate {
                 self.messages.send("The car did not expose its command channel")
                 return
             }
+            self.connectTimeoutTask?.cancel()
+            self.connectTimeoutTask = nil
             self.rxCharacteristic = rx
             self.connectionState = .connected
+            self.lastCarIdentifier = peripheral.identifier
+            self.startRssiPolling(peripheral)
             self.messages.send("Connected to \(self.connectedCarName ?? Self.carName)")
             // Start from a known-safe state: the car must not be moving on connect.
             self.send(Command.stop)
+        }
+    }
+
+    nonisolated func peripheral(
+        _ peripheral: CBPeripheral,
+        didReadRSSI RSSI: NSNumber,
+        error: Error?
+    ) {
+        Task { @MainActor in
+            self.rssi = RSSI.intValue
         }
     }
 
