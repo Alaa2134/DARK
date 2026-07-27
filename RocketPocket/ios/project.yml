@@ -1,0 +1,72 @@
+# XcodeGen spec. Generating the Xcode project from this instead of committing a .xcodeproj
+# keeps the repository free of the huge, merge-hostile pbxproj file, and lets CI rebuild the
+# project deterministically. Regenerate locally with:  brew install xcodegen && xcodegen generate
+
+name: RocketPocket
+
+options:
+  bundleIdPrefix: com.rocketpocket
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.9"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_IDENTITY: ""
+    CODE_SIGNING_REQUIRED: "NO"
+    CODE_SIGNING_ALLOWED: "NO"
+
+targets:
+  RocketPocket:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+      - path: Assets.xcassets
+      # buildPhase: resources so the WAVs are copied into the bundle rather than treated as
+      # source. Bundle.main.url(forResource:) finds nothing otherwise and the alerts are silent.
+      - path: Resources/Sounds
+        buildPhase: resources
+    # Deliberately no `info:` block. That key makes XcodeGen *generate* a plist at the given
+    # path, overwriting the committed one — which silently dropped
+    # NSBluetoothAlwaysUsageDescription (iOS kills an app that touches CoreBluetooth without
+    # it), the landscape lock and the launch screen. INFOPLIST_FILE below points the build at
+    # the real file instead.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.rocketpocket.car
+        PRODUCT_NAME: RocketPocket
+        INFOPLIST_FILE: Info.plist
+        TARGETED_DEVICE_FAMILY: "1,2"   # iPhone and iPad
+        ENABLE_BITCODE: "NO"
+        # Without this the asset catalog is compiled but no icon is assigned, and the app
+        # installs with a blank tile on the home screen.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+
+  RocketPocketTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: RocketPocket
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.rocketpocket.car.tests
+        GENERATE_INFOPLIST_FILE: "YES"
+
+schemes:
+  RocketPocket:
+    build:
+      targets:
+        RocketPocket: all
+        RocketPocketTests: [test]
+    test:
+      targets:
+        - RocketPocketTests
+    run:
+      config: Debug

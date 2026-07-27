@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+        The Compose theme in Theme.kt owns the real colours; this XML theme only has to hand
+        the window over without a light-mode flash before the first frame.
+
+        The parent is the platform Material theme rather than Theme.Material3.*, which lives in
+        the com.google.android.material library. This is a Compose-only app — androidx Compose
+        Material3 is a separate artifact that ships no XML styles — so depending on that library
+        purely for one style parent would be dead weight.
+    -->
+    <style name="Theme.RocketPocket" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/carbon_black</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+    </style>
+
+</resources>
