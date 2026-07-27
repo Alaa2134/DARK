@@ -98,6 +98,14 @@ unsigned long lastCommandAt   = 0;
 unsigned long lastBroadcastAt = 0;
 bool isMoving = false;
 
+// Diagnostics state. Declared here rather than beside sendDiagnostics() because drive() writes
+// the duties, and it runs earlier in the file.
+unsigned long watchdogTrips = 0;
+unsigned long lastDiagnosticsAt = 0;
+const unsigned long DIAGNOSTICS_INTERVAL_MS = 1000;
+int lastLeftDuty = 0;
+int lastRightDuty = 0;
+
 // ---------------------------------------------------------------------------------------------
 // LEDC compatibility — Arduino ESP32 core 2.x and 3.x
 // ---------------------------------------------------------------------------------------------
@@ -161,6 +169,8 @@ void drive(int leftDuty, int rightDuty) {
     driveLeft(leftDuty);
     driveRight(rightDuty);
   }
+  lastLeftDuty = leftDuty;
+  lastRightDuty = rightDuty;
   isMoving = (leftDuty != 0 || rightDuty != 0);
 
   Serial.print("  -> L=");
@@ -254,6 +264,34 @@ void runSelfTest() {
   Serial.println("  A wheel turned the wrong way                 -> that motor's INVERT flag = true");
   Serial.println("  Both wheels turned the wrong way             -> set BOTH invert flags true");
   lastCommandAt = millis();
+}
+
+// ---------------------------------------------------------------------------------------------
+// Diagnostics
+// ---------------------------------------------------------------------------------------------
+// Everything reported here is already known to the firmware — no extra hardware. Battery level,
+// ambient temperature and "is this motor plugged in" all genuinely need sensors (a voltage
+// divider, a DS18B20, a current sensor), so they are deliberately absent rather than guessed at.
+//
+// The watchdog counter is the useful one: it rises every time the link went quiet long enough
+// for the car to cut its own motors, which is the clearest measure of a marginal connection.
+void sendDiagnostics() {
+  lastDiagnosticsAt = millis();
+
+  String line = "DIAG";
+  line += " up=";    line += (millis() / 1000);          // seconds since boot
+  line += " heap=";  line += ESP.getFreeHeap();          // free RAM, a leak shows up here
+  line += " wd=";    line += watchdogTrips;              // times the car stopped itself
+  line += " spd=";   line += currentSpeed;
+  line += " L=";     line += lastLeftDuty;
+  line += " R=";     line += lastRightDuty;
+  line += " swap=";  line += (SWAP_MOTORS ? 1 : 0);
+  line += " invL=";  line += (INVERT_LEFT_MOTOR ? 1 : 0);
+  line += " invR=";  line += (INVERT_RIGHT_MOTOR ? 1 : 0);
+  line += " brake="; line += (BRAKE_ON_STOP ? 1 : 0);
+  line += " curve="; line += (REVERSE_CURVE_STEERS_LIKE_A_CAR ? 1 : 0);
+
+  notify(line);
 }
 
 void handleCommand(char command);   // defined below; the demo replays real commands
@@ -420,11 +458,18 @@ void loop() {
   // goes quiet. A second of silence means the driver is gone: cut the motors.
   if (isMoving && (now - lastCommandAt > COMMAND_TIMEOUT_MS)) {
     stopMotors();
+    watchdogTrips++;
     Serial.println("Watchdog: no command received, motors stopped");
   }
 
   if (deviceConnected && (now - lastBroadcastAt > SPEED_BROADCAST_MS)) {
     broadcastSpeed();
+  }
+
+  // Diagnostics run a quarter as often as the speed gauge: they are for reading,
+  // not reacting to, and there is no reason to spend link bandwidth on them.
+  if (deviceConnected && now - lastDiagnosticsAt > DIAGNOSTICS_INTERVAL_MS) {
+    sendDiagnostics();
   }
 
   delay(5);

@@ -25,6 +25,10 @@ final class ControlViewModel: ObservableObject {
     @Published private(set) var speed = ControlViewModel.defaultSpeed
     @Published private(set) var activeCommand: Character?
     @Published var showDevicePicker = false
+    @Published var showDiagnostics = false
+
+    /// Latest telemetry from the car; nil until a DIAG line arrives.
+    @Published private(set) var diagnostics: Diagnostics?
     @Published var message: String?
 
     private var keepAliveTask: Task<Void, Never>?
@@ -80,6 +84,11 @@ final class ControlViewModel: ObservableObject {
 
     /// The car is authoritative about its own PWM, so `SPEED:xxx` overwrites the local value.
     private func handle(line: String) {
+        // DIAG first: it is the more specific format, and a SPEED parse would reject it anyway.
+        if let report = Diagnostics.parse(line) {
+            diagnostics = report
+            return
+        }
         guard let value = SpeedTelemetry.parse(line) else { return }
         speed = value
     }

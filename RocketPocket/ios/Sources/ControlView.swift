@@ -90,6 +90,14 @@ struct ControlView: View {
         .sheet(isPresented: $model.showDevicePicker) {
             DevicePickerView(model: model)
         }
+        .sheet(isPresented: $model.showDiagnostics) {
+            DiagnosticsView(
+                diagnostics: model.diagnostics,
+                rssi: model.bluetooth.rssi,
+                connected: model.bluetooth.connectionState.isConnected,
+                carName: model.bluetooth.connectedCarName
+            )
+        }
     }
 
     private var header: some View {
@@ -108,6 +116,11 @@ struct ControlView: View {
             }
 
             Spacer()
+
+            DiagnosticsChip(diagnostics: model.diagnostics) {
+                model.showDiagnostics = true
+            }
+            .padding(.trailing, 8)
 
             MotionIndicator(
                 command: model.activeCommand,
